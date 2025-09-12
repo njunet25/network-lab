@@ -43,7 +43,7 @@ def stop_serve_server():
 def start_echo_server():
     global echo_server
     class EchoHandler(BaseHTTPRequestHandler):
-        def _send_response(self, method):
+        def _send_response(self, method, code = 200):
             length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(length) if length > 0 else b""
             content = "\n".join([
@@ -53,7 +53,7 @@ def start_echo_server():
                 f"body = ",
             ]).encode("utf-8") + body + b"."
 
-            self.send_response(200)
+            self.send_response(code)
             self.send_header("Content-Type", "text/plain")
             self.send_header("Content-Length", str(len(content)))
             self.end_headers()
@@ -69,6 +69,8 @@ def start_echo_server():
             self._send_response("PUT")
         def do_DELETE(self):
             self._send_response("DELETE")
+        def do_SPAM(self):
+            self._send_response("SPAM", code=501)
         def log_message(self, format, *args):
             pass
     echo_server = HTTPServer(("localhost", echo_port), EchoHandler)
@@ -233,6 +235,13 @@ def test_should_send_delete():
 
 it("should send DELETE request", test_should_send_delete)
 
+def test_should_send_custom_method():
+    res = run(["-X", "SPAM", f"http://127.0.0.1:{echo_port}/check.txt"])
+    assert res.returncode == 0, "return code should be 0"
+    assert b"method = SPAM." in res.stdout, "request method should be SPAM"
+
+it("should send custom method", test_should_send_custom_method)
+
 def test_should_404():
     res = run([f"http://127.0.0.1:{serve_port}/notfound.txt"])
     assert res.returncode == 0, "return code should be 0 for 404"
@@ -270,6 +279,11 @@ def test_url_with_hash():
 
 it("should ignore URL fragment/hash", test_url_with_hash)
 
+def test_invalid_option():
+    res = run(["-9", f"http://127.0.0.1:{echo_port}/check.txt"])
+    assert res.returncode != 0, "return code should not be 0"
+
+it("should error with invalid option", test_invalid_option)
 
 # =============
 
