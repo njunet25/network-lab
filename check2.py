@@ -285,6 +285,14 @@ def test_invalid_option():
 
 it("should error with invalid option", test_invalid_option)
 
+def test_visit_example_com():
+    res = run([f"http://example.com/"])
+    assert res.returncode == 0, "return code should be 0"
+    assert b"<h1>Example Domain</h1>" in res.stdout, "should have example domain in response"
+    assert b"<!doctype html>" in res.stdout, "should have <!doctype html> in response"
+
+it("should be ok visit http://example.com/", test_visit_example_com)
+
 # =============
 
 count_pass = 0
