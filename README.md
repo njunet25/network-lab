@@ -1,3 +1,20 @@
-# Network Lab
+# Network Lab 3
 
-Where all miracles begin.
+## Configure
+
+```bash
+mkdir build
+cmake -S . -B build
+```
+
+## Build
+
+```bash
+cmake --build build
+```
+
+## Check
+
+```bash
+python check3.py
+```
