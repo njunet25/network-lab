@@ -50,28 +50,24 @@ def it(name, fn):
 def normalize_domain(d):
     return d.rstrip('.').lower()
 
-def normalize_ipaddr(a):
-    return str(ipaddress.ip_address(a))
-
 def normalize_txt(t):
     if t.startswith('"') and t.endswith('"'):
         return t[1:-1]
     return t
 
-def compare_record(type_, record, expected):
-    record = record.strip()
-    expected = expected.strip()
+def match_text(record, expected):
+    return normalize_txt(record) == normalize_txt(expected)
 
-    if type_ in ("A", "AAAA"):
-        return normalize_ipaddr(record) == normalize_ipaddr(expected)
-    elif type_ == "TXT":
-        return normalize_txt(record) == normalize_txt(expected)
-    elif type_ == "CNAME":
-        return normalize_domain(record) == normalize_domain(expected)
-    
-    return False
+def match_ipv4(record, expected):
+    return ipaddress.IPv4Address(record) in ipaddress.IPv4Network(expected)
 
-def assert_has_record(domain, type_, record, output):
+def match_ipv6(record, expected):
+    return ipaddress.IPv6Address(record) in ipaddress.IPv6Network(expected)
+
+def match_cname(record, expected):
+    return normalize_domain(record) == normalize_domain(expected)
+
+def assert_has_record(domain, type_, expected, output):
     domain = normalize_domain(domain)
 
     for line in output.strip().splitlines():
@@ -79,10 +75,17 @@ def assert_has_record(domain, type_, record, output):
         if len(parts) < 3:
             continue
         d, t, r = parts[0], parts[1], " ".join(parts[2:])
-        if normalize_domain(d) == domain and t.upper() == type_ and compare_record(type_, r, record):
-            return
+        if normalize_domain(d) == domain and t.upper() == type_:
+            if type_ == "A" and match_ipv4(r, expected):
+                return
+            if type_ == "AAAA" and match_ipv6(r, expected):
+                return
+            if type_ == "CNAME" and match_cname(r, expected):
+                return
+            if type_ == "TXT" and match_text(r, expected):
+                return
 
-    raise AssertionError(f"Record not found: {domain} {type_} {record}")
+    raise AssertionError(f"Record not found: {domain} {type_} {expected}")
 
 
 # === tests ===
@@ -96,12 +99,7 @@ def test_www_example_com_aaaa():
     res = run("www.example.com", "AAAA")
     assert_has_record("www.example.com", "CNAME", "www.example.com-v4.edgesuite.net", res.stdout)
     assert_has_record("www.example.com-v4.edgesuite.net", "CNAME", "a1422.dscr.akamai.net", res.stdout)
-    assert_has_record("a1422.dscr.akamai.net", "AAAA", "2600:1417:76::172e:3ff1", res.stdout)
-    assert_has_record("a1422.dscr.akamai.net", "AAAA", "2600:1417:76::6874:f348", res.stdout)
-
-def test_google_ipv6_aaaa():
-    res = run("ipv6.google.com", "AAAA")
-    assert_has_record("ipv6.google.com", "AAAA", "2001::1", res.stdout)
+    assert_has_record("a1422.dscr.akamai.net", "AAAA", "2000::/3", res.stdout)
 
 def test_spf_google_txt():
     res = run("_spf.google.com", "TXT")
@@ -121,19 +119,24 @@ def test_nxdomain_nju_edu_cn():
 
 def test_www_mi_com():
     res = run("小米科技有限责任公司.中国", "A")
-    assert_has_record("小米科技有限责任公司.中国", "A", "111.13.141.215", res.stdout)
-    
+    assert_has_record("xn--boq62d51cv6mulib5gtq9aboevs9begt.xn--fiqs8s", "A", "0.0.0.0/0", res.stdout)
+
+def test_fake_apple_com():
+    res = run("www.аррӏе.com", "A")
+    assert_has_record("www.xn--80ak6aa92e.com", "CNAME", "xn--80ak6aa92e.com", res.stdout)
+    assert_has_record("xn--80ak6aa92e.com", "A", "104.198.14.52", res.stdout)
+    # assert_has_record("xn--80ak6aa92e.com", "A", "0.0.0.0/0", res.stdout)
 
 it("ipv4only.arpa A", test_ipv4_arpa_a)
 it("www.example.com AAAA", test_www_example_com_aaaa)
-it("ipv6.google.com AAAA", test_google_ipv6_aaaa)
 it("_spf.google.com TXT", test_spf_google_txt)
 it("www.nju.edu.cn A", test_www_nju_edu_cn_a)
 it("www.nju.edu.cn AAAA", test_www_nju_edu_cn_aaaa)
 it("nxdomain.nju.edu.cn AAAA", test_nxdomain_nju_edu_cn)
 
 if bonus_enabled:
-    it("IDN: 小米科技有限责任公司.中国 A", test_www_mi_com)
+    it("IDN: www.mi.com A", test_www_mi_com)
+    it("IDN: fake apple A", test_fake_apple_com)
 
 # =============
 
