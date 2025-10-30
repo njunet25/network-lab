@@ -23,7 +23,7 @@ __u32 BPF_PROG(ssthresh, struct sock *sk) {
 }
 
 SEC("struct_ops")
-void BPF_PROG(cong_avoid, __u32 ack, __u32 acked) {
+void BPF_PROG(cong_avoid, struct sock *sk, __u32 ack, __u32 acked) {
 
 }
 
