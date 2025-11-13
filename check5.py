@@ -97,11 +97,11 @@ def test_broadcast():
         raise AssertionError("traceroute has failed to report error.")
 
 def test_zero_ttl():
-    res = run("127.0.0.0", ["-f", "0"])
+    res = run("127.0.0.0", ["-m", "0"])
     if res.returncode == 0:
         raise AssertionError("failed to reject invalid TTL.")
 
-    res = run("127.0.0.0", ["-f", "1000"])
+    res = run("127.0.0.0", ["-m", "1000"])
     if res.returncode == 0:
         raise AssertionError("failed to reject invalid TTL.")
 
