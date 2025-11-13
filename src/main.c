@@ -1,5 +1,6 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <netinet/ip_icmp.h>
 #include <resolv.h>
 #include <stdio.h>
 #include <sys/socket.h>
@@ -21,8 +22,10 @@ void icmp_loop(int socket) {
   struct sockaddr_in addr;
   unsigned int addr_len;
   while (recvfrom(socket, buf, 1500, 0, (struct sockaddr *)&addr, &addr_len)) {
-    char icmp_type = buf[0+20];
-    char icmp_code = buf[1+20];
+    struct iphdr *buf_ip = (struct iphdr *)buf;
+    struct icmphdr *buf_icmp = (struct icmphdr *)(buf+buf_ip->tot_len);
+    int icmp_type = buf_icmp->type;
+    int icmp_code = buf_icmp->code;
     inet_ntop(AF_INET,  &addr.sin_addr,  ip,  32);
 
     fprintf(stderr,  "ip %s type %u code %u\n", ip, icmp_type, icmp_code);
