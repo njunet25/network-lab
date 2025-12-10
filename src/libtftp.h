@@ -1,6 +1,6 @@
 #include <stdio.h>
 
-// This code may not work with platform with does not allow unaligned access.
+// May require unaligned access.
 // 
 // See: https://www.kernel.org/doc/html/v6.18/core-api/unaligned-memory-access.html
 

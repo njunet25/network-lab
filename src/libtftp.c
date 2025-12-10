@@ -61,15 +61,19 @@ int tftp_parse_response(char *buf, int n, char **block, size_t *block_size) {
 int tftp_parse_oack(char *buf, int n, char **error) {
   struct tftphdr *hdr = (struct tftphdr *)buf;
   short opcode = ntohs(hdr->th_opcode);
-  int window;
+  short window;
   if (opcode == OACK) {
     char extension[12];
-    if (sscanf(buf + offsetof(struct tftphdr, th_u1),"%s %d", extension, &window) != 2) {
-      *error = "invalid OACK";
+    if (sscanf(buf + offsetof(struct tftphdr, th_u1),"%s", extension) != 1) {
+      *error = "invalid extension name";
       return -9;
     }
     if (strcmp(extension, "windowsize")) {
       *error = "not windowsize extension";
+      return 0;
+    }
+    if (sscanf(buf + offsetof(struct tftphdr, th_u1) + strlen(extension) + 1, "%hd", &window) != 1) {
+      *error = "malformed window size";
       return 0;
     }
     return window;

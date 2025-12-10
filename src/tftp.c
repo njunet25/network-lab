@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
   char *buf = malloc(1024);
 
   short window;
-  ret = sscanf(argv[5],"%d", &window);
+  ret = sscanf(argv[5],"%hd", &window);
   if (ret != 1) {
     printf("window_size should be a number.\n");
   }
@@ -86,7 +86,7 @@ int main(int argc, char **argv) {
     fprintf(stderr, "Remote returned error %d: %s\n", -ret, block);
     return 1;
   } else if (ret == 0) {
-    fprintf(stderr, "Server rejected windowsize.");
+    fprintf(stderr, "Server rejected windowsize: %s.\n", block);
     return 1;
   }
   window = ret;
@@ -111,8 +111,12 @@ int main(int argc, char **argv) {
   }
 
   FILE *target = fopen(argv[4], "wb");
+  if (!target) {
+    perror("fopen");
+    return 1;
+  }
 
-  timeout.tv_sec = 3;
+  timeout.tv_sec = 20;
   ret = setsockopt(sfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
   if (ret < 0) {
     perror("setsockopt");
