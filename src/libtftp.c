@@ -45,7 +45,7 @@ int tftp_parse_response(char *buf, int n, char **block, size_t *block_size) {
     *block = hdr->th_u1.th_u2.tu_data;
     *block_size = n - 4;
     int block_id = ntohs(hdr->th_u1.th_u2.th_u3.tu_block);
-    fprintf(stderr, "block %d: %ld bytes\n", block_id, *block_size);
+    //fprintf(stderr, "block %d: %ld bytes\n", block_id, *block_size);
     return ntohs(hdr->th_u1.th_u2.th_u3.tu_block);
   } else if (opcode == ERROR) {
     *block = hdr->th_u1.th_u2.tu_data;
