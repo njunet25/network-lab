@@ -1,20 +1,19 @@
-# Network Lab 3
+# Network Lab 7
 
 ## Configure
 
 ```bash
-mkdir build
-cmake -S . -B build
+meson setup build
 ```
 
 ## Build
 
 ```bash
-cmake --build build
+meson compile -C build
 ```
 
 ## Check
 
 ```bash
-python check3.py
+python check7.py
 ```
