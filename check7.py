@@ -11,11 +11,14 @@ import signal
 
 import argparse
 
-parser = argparse.ArgumentParser(description="Run traceroute checker")
+# Modify your UID here
+user_uid = 1000
+
+parser = argparse.ArgumentParser(description="A checker for TFTP program")
 parser.add_argument("exe_path", nargs="?", default="./build/tftp",
                     help="Path to the executable (default: ./build/tftp)")
-parser.add_argument("--bonus", action="store_true",
-                    help="Test for Bonus")
+# parser.add_argument("--bonus", action="store_true",
+#                     help="Test for Bonus")
 parser.add_argument("--no-window", action="store_true",
                     help="Disable window")
 parser.add_argument("--dump", nargs="?", const="dump.pcap",
@@ -24,7 +27,7 @@ parser.add_argument("--dump", nargs="?", const="dump.pcap",
 args = parser.parse_args()
 
 exe_path = args.exe_path
-bonus_enabled = args.bonus
+# bonus_enabled = args.bonus
 dump_path = args.dump
 disable_window = args.no_window
 #nocapture = args.nocapture
@@ -84,12 +87,12 @@ def ns_run(ns, prog, *options, timeout=240):
         text=True,
     )
 
-def ns_run_as(ns, prog, *options, timeout=600, user=1000):
+def ns_run_as(ns, prog, *options, timeout=600, user=user_uid):
     return ns_run(ns, "sudo", "-u", f"#{user}", prog, *options)
 
 def run_server():
     return subprocess.Popen(
-        ["ip", "netns", "exec", "tftpd", "sudo", "-u", "#1000", "atftpd", "--bind-address", "10.0.70.3", "--no-fork", "--daemon",
+        ["ip", "netns", "exec", "tftpd", "sudo", "-u", f"#{user_uid}", "atftpd", "--bind-address", "10.0.70.3", "--no-fork", "--daemon",
             "--port","6969","--prevent-sas","/tmp/tftpd"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
@@ -120,7 +123,7 @@ def run_tftp(file, window=1):
         window = 1
     shutil.rmtree("/tmp/tftp", ignore_errors=True)
     os.makedirs("/tmp/tftp", exist_ok=True)
-    os.chown("/tmp/tftp", 1000, 1000)
+    os.chown("/tmp/tftp", user_uid, user_uid)
 
     start = time.perf_counter()
     ret = ns_run_as("tftp", exe_path, "10.0.70.3", "6969", f"{file}", f"/tmp/tftp/{file}", f"{window}")
@@ -319,7 +322,8 @@ def fetch_lfn():
     finally:
         tc_clean_all()
 
-os.chown("/tmp/tftp", 1000, 1000)
+os.makedirs("/tmp/tftp", exist_ok=True)
+os.chown("/tmp/tftp", user_uid, user_uid)
 os.makedirs("/tmp/tftpd", exist_ok=True)
 
 create_random_file("/tmp/tftpd/test.386", 386)
