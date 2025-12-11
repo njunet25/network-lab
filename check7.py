@@ -126,9 +126,9 @@ def run_tftp(file, window=1):
     ret = ns_run_as("tftp", exe_path, "10.0.70.3", "6969", f"{file}", f"/tmp/tftp/{file}", f"{window}")
     end = time.perf_counter()
 
-
     if ret.returncode != 0:
-        print(f"tftp: return {ret.returncode}\nstderr:\n{ret.stderr}")
+        raise RuntimeError(f"tftp: return {ret.returncode}\nstderr:\n{ret.stderr}")
+
     if not compare_files(f"/tmp/tftpd/{file}", f"/tmp/tftp/{file}"):
         raise AssertionError(f"File mismatch, stderr: \n{ret.stderr}")
     elapsed = end - start
