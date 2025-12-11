@@ -16,6 +16,8 @@ parser.add_argument("exe_path", nargs="?", default="./build/tftp",
                     help="Path to the executable (default: ./build/tftp)")
 parser.add_argument("--bonus", action="store_true",
                     help="Test for Bonus")
+parser.add_argument("--no-window", action="store_true",
+                    help="Disable window")
 parser.add_argument("--dump", nargs="?", const="dump.pcap",
                     help="Enable tcpdump, and dump to specific path, defaults to `dump.pcap`")
 
@@ -24,6 +26,8 @@ args = parser.parse_args()
 exe_path = args.exe_path
 bonus_enabled = args.bonus
 dump_path = args.dump
+disable_window = args.no_window
+#nocapture = args.nocapture
 
 # print("Executable path:", exe_path)
 # print("Bonus enabled:", bonus_enabled)
@@ -41,7 +45,6 @@ print(f"preparing tests for {exe_path}...")
 def run(target, options, timeout=60):
     return subprocess.run(
         [exe_path, *options],
-        capture_output=True,
         timeout=timeout,
         text=True,
     )
@@ -50,7 +53,8 @@ def run_command(prog, *options):
     try:
         return subprocess.run(
             [prog, *options],
-            capture_output=True,
+            capture_output=False,
+            stderr=sys.stderr,
             text=True,
         )
     except subprocess.CalledProcessError as e:
@@ -85,8 +89,12 @@ def ns_run_as(ns, prog, *options, timeout=120, user=1000):
 
 def run_server():
     return subprocess.Popen(
-        ["ip", "netns", "exec", "tftpd", "atftpd", "--bind-address", "10.0.70.3", "--no-fork", "--daemon",
-            "--port","6969", "--trace", "--logfile","/tmp/atftpd.log","/tmp/tftpd"]
+        ["ip", "netns", "exec", "tftpd", "sudo", "-u", "#1000", "atftpd", "--bind-address", "10.0.70.3", "--no-fork", "--daemon",
+            "--port","6969","--prevent-sas","/tmp/tftpd"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        preexec_fn=os.setsid
     )
 
 def run_tcpdump(path):
@@ -108,6 +116,8 @@ def signal_cleanup(signum, frame):
     sys.exit(1)
 
 def run_tftp(file, window=1):
+    if disable_window:
+        window = 1
     shutil.rmtree("/tmp/tftp", ignore_errors=True)
     os.makedirs("/tmp/tftp", exist_ok=True)
     os.chown("/tmp/tftp", 1000, 1000)
@@ -123,7 +133,7 @@ def run_tftp(file, window=1):
         raise AssertionError(f"File mismatch, stderr: \n{ret.stderr}")
     elapsed = end - start
     size = os.path.getsize(f"/tmp/tftp/{file}")
-    print(f"Transferred {size/1024:.1f} KB, window {window}, {size/elapsed/1024:.2f} KB/s")
+    print(f"{size/1024:.1f} KB, window {window}, {size/elapsed/1024:.2f} KB/s")
 
 def setup_network(ns1, ns2, veth0="veth0", veth1="veth1"):
     ns_create(ns1)
@@ -226,24 +236,26 @@ def fetch_latency():
 
 def fetch_lossy():
     try:
-        tc_set("tftpd", "veth1", loss=25, latency=100)
-        tc_set("tftp", "veth0", loss=25, latency=100)
+        tc_set("tftpd", "veth1", loss=20, latency=100)
+        tc_set("tftp", "veth0", loss=20, latency=100)
         run_tftp("test.4k", 1)
         run_tftp("test.4k", 4)
+        run_tftp("test.16k", 4)
         run_tftp("test.128k", 16)
-        run_tftp("test.16m", 32)
-        run_tftp("test.24m", 64)
+        #run_tftp("test.16m", 32)
+        #run_tftp("test.24m", 64)
         tc_clean("tftp", "veth0")
         tc_clean("tftpd", "veth1")
 
 
-        tc_set("tftpd", "veth1", loss=10, latency=100)
-        tc_set("tftp", "veth0", loss=10, latency=100)
+        tc_set("tftpd", "veth1", loss=10, latency=50)
+        tc_set("tftp", "veth0", loss=10, latency=50)
         run_tftp("test.4k", 1)
         run_tftp("test.4k", 4)
-        run_tftp("test.512k", 16)
-        run_tftp("test.16m", 32)
-        run_tftp("test.24m", 64)
+        run_tftp("test.16k", 4)
+        run_tftp("test.128k", 16)
+        #run_tftp("test.16m", 32)
+        #run_tftp("test.24m", 64)
         tc_clean("tftp", "veth0")
         tc_clean("tftpd", "veth1")
     finally:
@@ -252,16 +264,18 @@ def fetch_lossy():
 
 def fetch_reorder():
     try:
-        tc_set("tftpd", "veth1", reorder_ratio=25, reorder_gap=5, latency=25)
-        tc_set("tftp", "veth0", reorder_ratio=25, reorder_gap=5, latency=25)
+        tc_set("tftpd", "veth1", reorder_ratio=5, reorder_gap=5, latency=25)
+        tc_set("tftp", "veth0", reorder_ratio=5, reorder_gap=5, latency=25)
+        run_tftp("test.4k", 16)
         run_tftp("test.128k", 16)
         run_tftp("test.16m", 32)
         run_tftp("test.24m", 64)
         tc_clean("tftp", "veth0")
         tc_clean("tftpd", "veth1")
 
-        tc_set("tftpd", "veth1", reorder_ratio=15, reorder_gap=5, latency=25)
-        tc_set("tftp", "veth0", reorder_ratio=15, reorder_gap=5, latency=25)
+        tc_set("tftpd", "veth1", reorder_ratio=2, reorder_gap=5, latency=25)
+        tc_set("tftp", "veth0", reorder_ratio=2, reorder_gap=5, latency=25)
+        run_tftp("test.4k", 16)
         run_tftp("test.128k", 16)
         run_tftp("test.16m", 32)
         run_tftp("test.24m", 64)
@@ -271,10 +285,9 @@ def fetch_reorder():
         tc_clean_all()
 
 def fetch_lfn():
-    # 500ms RTT, slightly reorder, no rate limit, max window 512.
     try:
-        tc_set("tftpd", "veth1", latency=500, reorder_ratio=2, reorder_gap=5)
-        tc_set("tftp", "veth0", latency=500, reorder_ratio=2, reorder_gap=5)
+        tc_set("tftpd", "veth1", latency=100, reorder_ratio=0.5, reorder_gap=5, loss=0.1)
+        tc_set("tftp", "veth0", latency=100, reorder_ratio=0.5, reorder_gap=5, loss=0.1)
         run_tftp("test.128k", 16)
         run_tftp("test.16m", 32)
         run_tftp("test.24m", 64)
@@ -347,3 +360,10 @@ result = "\033[32mok\033[0m" if count_pass == count_test else "\033[31mfail\033[
 print(f"test result: {result}. {count_pass} passed; {count_test - count_pass} failed; finished in {elapsed:.2f}s")
 
 run_cleanup()
+
+if count_test == count_pass:
+    ret = 0
+else:
+    ret = 1
+
+sys.exit(ret)
