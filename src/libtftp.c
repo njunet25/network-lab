@@ -39,13 +39,16 @@ int tftp_build_rrq(char *buf, int n, char *filename, short window) {
 }
 
 int tftp_parse_response(char *buf, int n, char **block, size_t *block_size) {
+  if (n < 4) {
+    *block = "message too short";
+    *block_size = sizeof("message too short");
+    return -10;
+  }
   struct tftphdr *hdr = (struct tftphdr *)buf;
   short opcode = ntohs(hdr->th_opcode);
   if (opcode == DATA) {
     *block = hdr->th_u1.th_u2.tu_data;
     *block_size = n - 4;
-    int block_id = ntohs(hdr->th_u1.th_u2.th_u3.tu_block);
-    //fprintf(stderr, "block %d: %ld bytes\n", block_id, *block_size);
     return ntohs(hdr->th_u1.th_u2.th_u3.tu_block);
   } else if (opcode == ERROR) {
     *block = hdr->th_u1.th_u2.tu_data;
@@ -54,19 +57,23 @@ int tftp_parse_response(char *buf, int n, char **block, size_t *block_size) {
   } else {
     *block = "unknown opcode";
     *block_size = sizeof("unknown opcode");
-    return -1;
+    return -10;
   }
 }
 
 int tftp_parse_oack(char *buf, int n, char **error) {
+  if (n < 4) {
+    *error = "message too short";
+    return -10;
+  }
   struct tftphdr *hdr = (struct tftphdr *)buf;
   short opcode = ntohs(hdr->th_opcode);
   short window;
   if (opcode == OACK) {
     char extension[12];
-    if (sscanf(buf + offsetof(struct tftphdr, th_u1),"%s", extension) != 1) {
+    if (sscanf(buf + offsetof(struct tftphdr, th_u1),"%11s", extension) != 1) {
       *error = "invalid extension name";
-      return -9;
+      return -10;
     }
     if (strcmp(extension, "windowsize")) {
       *error = "not windowsize extension";
@@ -74,7 +81,7 @@ int tftp_parse_oack(char *buf, int n, char **error) {
     }
     if (sscanf(buf + offsetof(struct tftphdr, th_u1) + strlen(extension) + 1, "%hd", &window) != 1) {
       *error = "malformed window size";
-      return 0;
+      return -10;
     }
     return window;
   } else if (opcode == ERROR) {
@@ -82,7 +89,7 @@ int tftp_parse_oack(char *buf, int n, char **error) {
     return -ntohs(hdr->th_u1.th_u2.th_u3.tu_code);
   } else {
     *error = "unknown opcode in OACK response";
-    return -1;
+    return -10;
   }
 }
 

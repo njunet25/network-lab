@@ -54,18 +54,14 @@ int main(int argc, char **argv) {
   }
   len = tftp_build_rrq(buf, 1024, argv[3], window);
 
-  ret = sendto(sfd, buf, len, 0, result->ai_addr, result->ai_addrlen);
-  if (ret < 0) {
-    perror("sendto");
-    return 1;
-  }
+  int retrys = 0;
 
-  struct sockaddr addr;
-  socklen_t addrlen = sizeof(struct sockaddr);
   struct timeval timeout = {
     .tv_sec = 10,
     .tv_usec = 0,
   };
+  struct sockaddr addr;
+  socklen_t addrlen = sizeof(struct sockaddr);
 
   ret = setsockopt(sfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
   if (ret < 0) {
@@ -73,9 +69,24 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  ret = recvfrom(sfd, buf, 1024, 0, &addr, &addrlen);
-  if (ret < 0) {
-    perror("recvfrom");
+  while (++retrys < 5) {
+    ret = sendto(sfd, buf, len, 0, result->ai_addr, result->ai_addrlen);
+    if (ret < 0) {
+      perror("sendto");
+      return 1;
+    }
+
+    ret = recvfrom(sfd, buf, 1024, 0, &addr, &addrlen);
+    if (ret < 0) {
+      perror("recvfrom");
+      continue;
+    } else {
+      break;
+    }
+  }
+
+  if (retrys >=5) {
+    fprintf(stderr, "failed to connect to server, bailing out...\n");
     return 1;
   }
 
@@ -116,7 +127,8 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  timeout.tv_sec = 20;
+  timeout.tv_sec = 3;
+  timeout.tv_usec = 0;
   ret = setsockopt(sfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
   if (ret < 0) {
     perror("setsockopt");

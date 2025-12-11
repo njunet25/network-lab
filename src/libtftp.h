@@ -24,7 +24,7 @@ int tftp_build_rrq(char *buf, int n, char *filename, short window);
   @param[out] block pointer to data/error message in packet, NULL on invalid packet
   @param[out] block_size length of data/error message
 
-  @return positive value for seqno on success, negative value for negated error code.
+  @return positive value for seqno on success, negative value or zero for negated error code.
  */
 int tftp_parse_response(char *buf, int n, char **block, size_t *block_size);
 
@@ -35,7 +35,7 @@ int tftp_parse_response(char *buf, int n, char **block, size_t *block_size);
   @param[in] n packet length
   @param[out] error pointer to error message in packet
 
-  @return positive value for server-side window on success, negative value for negated error code.
+  @return positive value for server-side window on success, negative value or zero for negated error code.
  */
 int tftp_parse_oack(char *buf, int n, char **error);
 
