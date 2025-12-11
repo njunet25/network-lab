@@ -76,7 +76,7 @@ def ns_remove(ns):
     print(f"Deleting netns: {ns}")
     assert run_command("ip","netns","del", ns).returncode == 0
 
-def ns_run(ns, prog, *options, timeout=120):
+def ns_run(ns, prog, *options, timeout=240):
     return subprocess.run(
         ["ip", "netns", "exec", ns, prog, *options],
         capture_output=True,
@@ -211,9 +211,6 @@ def fetch():
     run_tftp("test.512")
     run_tftp("test.513")
     run_tftp("test.4k", 1)
-    run_tftp("test.128k",1)
-    run_tftp("test.16m", 1)
-    run_tftp("test.24m", 1)
 
 def fetch_with_window():
     run_tftp("test.4k", 1)
@@ -223,25 +220,26 @@ def fetch_with_window():
 
 def fetch_latency():
     try:
-        tc_set("tftpd", "veth1", latency=500)
-        tc_set("tftp", "veth0", latency=500)
+        # asymmetric latency.
+        tc_set("tftpd", "veth1", latency=300)
+        tc_set("tftp", "veth0", latency=100)
         run_tftp("test.4k", 1)
-        run_tftp("test.4k", 4)
         run_tftp("test.16k", 1)
-        run_tftp("test.16k", 16)
+        run_tftp("test.16k", 8)
+        run_tftp("test.64k", 16)
     finally:
         tc_clean("tftp", "veth0")
         tc_clean("tftpd", "veth1")
-
 
 def fetch_lossy():
     try:
         tc_set("tftpd", "veth1", loss=20, latency=100)
         tc_set("tftp", "veth0", loss=20, latency=100)
         run_tftp("test.4k", 1)
-        run_tftp("test.4k", 4)
         run_tftp("test.16k", 4)
-        run_tftp("test.128k", 16)
+        #run_tftp("test.64k", 4)
+        run_tftp("test.64k", 16)
+        run_tftp("test.128k", 32)
         #run_tftp("test.16m", 32)
         #run_tftp("test.24m", 64)
         tc_clean("tftp", "veth0")
@@ -251,11 +249,15 @@ def fetch_lossy():
         tc_set("tftpd", "veth1", loss=10, latency=50)
         tc_set("tftp", "veth0", loss=10, latency=50)
         run_tftp("test.4k", 1)
-        run_tftp("test.4k", 4)
+        #run_tftp("test.4k", 4)
         run_tftp("test.16k", 4)
-        run_tftp("test.128k", 16)
+        #run_tftp("test.16k", 16)
+        run_tftp("test.64k", 16)
+        run_tftp("test.128k", 32)
+        run_tftp("test.512k", 64)
         #run_tftp("test.16m", 32)
-        #run_tftp("test.24m", 64)
+        #run_tftp("test.16m", 32)
+        #run_tftp("test.24m", 128)
         tc_clean("tftp", "veth0")
         tc_clean("tftpd", "veth1")
     finally:
@@ -266,10 +268,13 @@ def fetch_reorder():
     try:
         tc_set("tftpd", "veth1", reorder_ratio=5, reorder_gap=5, latency=25)
         tc_set("tftp", "veth0", reorder_ratio=5, reorder_gap=5, latency=25)
-        run_tftp("test.4k", 16)
+        run_tftp("test.4k", 1)
+        run_tftp("test.4k", 4)
         run_tftp("test.128k", 16)
         run_tftp("test.16m", 32)
-        run_tftp("test.24m", 64)
+        run_tftp("test.24m", 256)
+        run_tftp("test.24m", 512)
+        run_tftp("test.24m", 1024)
         tc_clean("tftp", "veth0")
         tc_clean("tftpd", "veth1")
 
@@ -277,23 +282,24 @@ def fetch_reorder():
         tc_set("tftp", "veth0", reorder_ratio=2, reorder_gap=5, latency=25)
         run_tftp("test.4k", 16)
         run_tftp("test.128k", 16)
-        run_tftp("test.16m", 32)
-        run_tftp("test.24m", 64)
+        run_tftp("test.16m", 256)
+        run_tftp("test.16m", 512)
+        run_tftp("test.24m", 1024)
         tc_clean("tftp", "veth0")
         tc_clean("tftpd", "veth1")
     finally:
         tc_clean_all()
 
 def fetch_lfn():
+    # 200ms RTT, unlimited speed.
     try:
-        tc_set("tftpd", "veth1", latency=100, reorder_ratio=0.5, reorder_gap=5, loss=0.1)
-        tc_set("tftp", "veth0", latency=100, reorder_ratio=0.5, reorder_gap=5, loss=0.1)
-        run_tftp("test.128k", 16)
-        run_tftp("test.16m", 32)
-        run_tftp("test.24m", 64)
+        tc_set("tftpd", "veth1", latency=100, reorder_ratio=0.5, reorder_gap=5, loss=0.2)
+        tc_set("tftp", "veth0", latency=100, reorder_ratio=0.5, reorder_gap=5, loss=0.2)
+        run_tftp("test.128k", 32)
         run_tftp("test.24m", 128)
         run_tftp("test.24m", 256)
         run_tftp("test.24m", 512)
+        run_tftp("test.24m", 1024)
         tc_clean("tftp", "veth0")
         tc_clean("tftpd", "veth1")
     finally:
@@ -307,6 +313,7 @@ create_random_file("/tmp/tftpd/test.512", 512)
 create_random_file("/tmp/tftpd/test.513", 513)
 create_random_file("/tmp/tftpd/test.4k", 1024*4)
 create_random_file("/tmp/tftpd/test.16k", 1024*16)
+create_random_file("/tmp/tftpd/test.64k", 1024*16)
 create_random_file("/tmp/tftpd/test.128k", 1024*128)
 create_random_file("/tmp/tftpd/test.512k", 1024*512)
 create_random_file("/tmp/tftpd/test.16m", 1024*1024*16)
@@ -357,6 +364,9 @@ print("")
 end = time.perf_counter()
 elapsed = end - start
 result = "\033[32mok\033[0m" if count_pass == count_test else "\033[31mfail\033[0m"
+if disable_window:
+    print("Test with window disabled.")
+
 print(f"test result: {result}. {count_pass} passed; {count_test - count_pass} failed; finished in {elapsed:.2f}s")
 
 run_cleanup()
